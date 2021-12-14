@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <script
+      type="text/javascript"
+      src="//media.twiliocdn.com/sdk/js/sync/v3.0/twilio-sync.min.js"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/phaser@3.15.1/dist/phaser-arcade-physics.min.js"
+    >
+      <link rel="stylesheet" href="./styles/index.css">
+    </script>
+
+    <title>Captain's Chair</title>
+  </head>
+  <body>
+    <script type="module">
+      const token = {{token.token | dump | safe }};
+      const syncClient = new Twilio.Sync.Client(token);
+
+      async function initDoc(syncClient, docString) {
+        const document = await syncClient.document(docString);
+        return document.data;
+      }
+
+      async function subscribeToStreams(syncClient, players, emitter) {
+        for (const player of players) {
+          syncClient
+            .stream(player.guid)
+            .then((stream) => {
+              console.log(`Successfully opened stream: ${stream.sid}`);
+              stream.on("messagePublished", (event) => {
+                console.log('Received a "messagePublished" event:', event);
+                const { x, y } = event.message.data;
+                emitter.emit('playerMove', x, y, player.guid);
+              });
+            })
+            .catch(function (error) {
+              console.error("Error initializing stream", error);
+            });
+        }
+      }
+
+      const data = await initDoc(syncClient, "MMSnfIT9LtgZuSHF0XIm");
+      const players = data.players;
+
+      class Map extends Phaser.Scene
+        {
+            constructor ()
+            {
+                super();
+            }
+
+            preload() {
+              // load the PNG file
+              this.load.image("base_map", "./maps/test.png");
+              this.load.image("TwilioQuestTileset", "./maps/TwilioQuestTileset.png");
+
+              // load the JSON file
+              this.load.tilemapTiledJSON("tilemap", "./maps/test.json");
+
+              this.load.spritesheet("player", "./images/player.png", {
+                frameWidth: 32,
+                frameHeight: 32,
+              });
+            }
+
+            async create() {
+
+              const emitter = new Phaser.Events.EventEmitter();
+
+              emitter.on("playerMove", this.playerMoveHandler, this);
+
+              subscribeToStreams(syncClient, players, emitter);
+              // create the Tilemap
+
+              const map = this.make.tilemap({
+                key: "tilemap",
+                tileWidth: 24,
+                tileHeight: 24,
+              });
+
+              // add the tileset image we are using
+              const tileset = map.addTilesetImage("TwilioQuestTileset");
+
+              // create the layers we want in the right order
+              map.createStaticLayer("Base", tileset);
+              map.createStaticLayer("Decoration", tileset);
+              map.createStaticLayer("Decoration 2", tileset);
+              // map.createStaticLayer("Objects", tileset);
+              map.createStaticLayer("Top", tileset);
+              //map.createStaticLayer("Collision", tileset);
+
+              //s = this.add.sprite(300, 400, "player", 4);
+            }
+
+            playerMoveHandler(x, y, guid){
+              console.log("player move event", x, y, guid)
+              const player = players.find(player => player.guid === guid);
+              if (player.hasOwnProperty("sprite")){
+                console.log("Player has sprite, moving");
+                player.sprite.setPosition(x, y);
+                //this.physics.moveToObject(player.sprite, {x, y}, 200)
+              } else {
+                console.log("Creating sprite");
+                player.sprite = this.add.sprite(x, y, "player", 0);
+                //player.sprite = this.physics.add.image(x, y, "player", 0);
+              }
+            }
+
+            update() {
+              this.add.sprite(300, 400, "player", 0);
+            }
+        }
+
+      const config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 600,
+        physics: {
+          default: "arcade",
+          arcade: {
+            gravity: { y: 200 },
+          },
+        },
+        scene: [ Map ]
+      };
+
+      const game = new Phaser.Game(config);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "nodejs-twilio-boilerplate",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.24.0",
+    "express": "^4.17.1",
+    "nunjucks": "^3.2.3",
+    "phaser": "^3.55.2",
+    "twilio": "^3.68.0"
+  }
+}
